@@ -6,9 +6,12 @@ from typing import Dict, Any, List
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import cv2
 import numpy as np
+from PIL import Image
+import pillow_heif
 
 from read_plate import load_reader, read_plates_from_image
 from fetch_api import query_vehicle_data
@@ -18,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = STATIC_DIR / "uploads"
 ANNOTATED_DIR = STATIC_DIR / "annotated"
-ALLOWED_EXTS = {"jpg", "jpeg", "png", "bmp", "webp"}
+ALLOWED_EXTS = {"jpg", "jpeg", "png", "bmp", "webp", "heic", "heif"}
 MAX_CONTENT_LENGTH = 12 * 1024 * 1024  # 12 MB
 
 #Sørg for at upload/annotated mapperne findes
@@ -38,6 +41,32 @@ OCR_LOCK = threading.Lock()
 #Ændre filnavn for at forhindre navnekollisioner
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTS
+
+#Konverter HEIC/HEIF til JPG
+def convert_if_heic(path: Path) -> Path:
+    if path.suffix.lower() not in [".heic", ".heif"]:
+        return path
+    heif_file = pillow_heif.read_heif(str(path))
+    img = Image.frombytes(
+        heif_file.mode, heif_file.size, heif_file.data,
+        "raw", heif_file.mode, heif_file.stride
+    )
+    converted = path.with_suffix(".jpg")
+    img.save(converted, format="JPEG")
+    path.unlink(missing_ok=True)
+    return converted
+
+#Skaler store billeder ned for at undgå crash
+def resize_if_large(path: Path, max_dim: int = 1600) -> None:
+    img = cv2.imread(str(path))
+    if img is None:
+        return
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = cv2.resize(img, (new_w, new_h))
+        cv2.imwrite(str(path), resized)
 
 #Tegn boks og label på billedet
 def draw_box(img, box, label=None):
@@ -77,7 +106,7 @@ def upload():
         flash("No selected file", "error")
         return redirect(url_for("index"))
     if not allowed_file(file.filename):
-        flash("Unsupported file type. Use JPG/PNG/BMP/WEBP.", "error")
+        flash("Unsupported file type. Use JPG/PNG/WEBP/HEIC.", "error")
         return redirect(url_for("index"))
 
     filename = secure_filename(file.filename)
@@ -85,6 +114,12 @@ def upload():
     unique_name = f"{Path(filename).stem}_{uuid.uuid4().hex[:8]}.{ext}"
     save_path = UPLOAD_DIR / unique_name
     file.save(str(save_path))
+
+    #Konverter HEIC hvis nødvendigt
+    save_path = convert_if_heic(save_path)
+
+    #Reducer billedstørrelse hvis for stort
+    resize_if_large(save_path)
 
     #Proccesser billede og læs plader
     with OCR_LOCK:
@@ -140,6 +175,12 @@ def upload():
         results=results,
         no_plates=False,
     )
+
+#Fejl hvis fil er for stor
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    flash("The selected file is too large. Max size is 12 MB.", "error")
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
