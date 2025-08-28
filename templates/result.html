@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Results • DK Plate Reader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Results</h1>
+      <div class="row row-2">
+        <div>
+          <h2 class="muted">Original</h2>
+          <div class="imgbox">
+            <img src="{{ original_url }}" alt="Uploaded image">
+          </div>
+        </div>
+        {% if annotated_url %}
+        <div>
+          <h2 class="muted">Annotated</h2>
+          <div class="imgbox">
+            <img src="{{ annotated_url }}" alt="Annotated image with detections">
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="sticky">
+        <a class="btn" href="{{ url_for('index') }}">← Analyze another</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Detected Plates</h2>
+      {% if no_plates %}
+        <p class="muted">No Danish-style plates were detected.</p>
+      {% else %}
+        {% for r in results %}
+          <div style="margin-bottom:14px">
+            <div>Plate: <span class="plate">{{ r.plate }}</span>
+              <span class="muted">(conf {{ '%.2f'|format(r.confidence) }})</span>
+            </div>
+
+            {% if r.errors.vehicle or r.errors.environment or r.errors.equipment %}
+              <div class="muted" style="margin-top:4px">
+                API issues:
+                {% if r.errors.vehicle %} vehicle={{ r.errors.vehicle }}{% endif %}
+                {% if r.errors.environment %} environment={{ r.errors.environment }}{% endif %}
+                {% if r.errors.equipment %} equipment={{ r.errors.equipment }}{% endif %}
+              </div>
+            {% endif %}
+
+            {% if r.vehicle %}
+              <ul class="kv">
+                {% set v = r.vehicle %}
+                {% set env = r.environment or {} %}
+                {% if v.make or v.brand %}<li><b>Make</b>: {{ v.make or v.brand }}</li>{% endif %}
+                {% if v.model %}<li><b>Model</b>: {{ v.model }}</li>{% endif %}
+                {% if v.variant %}<li><b>Variant</b>: {{ v.variant }}</li>{% endif %}
+                {% if v.model_year %}<li><b>Model year</b>: {{ v.model_year }}</li>{% endif %}
+                {% if v.first_registration %}<li><b>First reg.</b>: {{ v.first_registration }}</li>{% endif %}
+                {% if v.vin %}<li><b>VIN</b>: {{ v.vin }}</li>{% endif %}
+                {% if v.fuel_type or env.fuel_type %}<li><b>Fuel</b>: {{ v.fuel_type or env.fuel_type }}</li>{% endif %}
+                {% if env.emission_class %}<li><b>Emission class</b>: {{ env.emission_class }}</li>{% endif %}
+                {% if v.power_kw or v.power %}<li><b>Power</b>: {{ v.power_kw or v.power }} kW</li>{% endif %}
+                {% if v.total_weight or v.gross_weight %}<li><b>Weight</b>: {{ v.total_weight or v.gross_weight }} kg</li>{% endif %}
+              </ul>
+            {% else %}
+              <p class="muted">No vehicle data returned.</p>
+            {% endif %}
+
+            {% if r.equipment %}
+              <div class="muted" style="margin-top:6px">
+                Equipment (sample): {{ (r.equipment[:5] | join(', ')) ~ (' ...' if r.equipment|length > 5) }}
+              </div>
+            {% endif %}
+          </div>
+          {% if not loop.last %}<hr style="border-color:#1f2937">{% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
