@@ -1,16 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
 <head>
   <meta charset="utf-8">
-  <title>DK Plate Reader</title>
+  <title>Nummerplade læser med machinelearning</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    /* skjul knappen indtil der er valgt en fil */
+    .btn.hidden { display: none; }
+  </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Read Danish Number Plates</h1>
-      <p>Upload or snap a photo. We’ll detect the plate, annotate it, and fetch vehicle info via MotorAPI.</p>
+      <h1>Læs danske nummerplader</h1>
+      <p>Upload eller tag et billede. Så finder vi data på bilen via MotorAPI</p>
 
       {% with messages = get_flashed_messages(category_filter=["error"]) %}
         {% if messages %}
@@ -21,31 +25,45 @@
       {% endwith %}
 
       <form id="form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Upload image area">
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Upload billede område">
           <div>
-            <div style="font-weight:700;margin-bottom:6px">Choose an image</div>
-            <div class="hint">JPG, PNG, BMP, WEBP (max ~12MB). On mobile you can use the camera.</div>
+            <div class="drop-title">Vælg et billede:</div>
+            <div class="hint">JPG, PNG, BMP, WEBP (max ~12MB). Du kan også tage billedet direkte via din mobils kamera.</div>
           </div>
           <label class="label-file">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0 4 4M12 4 8 8M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <span>Select file</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 16V4m0 0 4 4M12 4 8 8M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Vælg fil</span>
             <input id="file" type="file" name="image" accept="image/*" capture="environment" required>
           </label>
           <div id="preview" class="hint"></div>
         </div>
 
         <div class="sticky">
-          <button class="btn" type="submit">
-            <span>Analyze</span>
+          <button class="btn hidden" type="submit" id="analyzeBtn">
+            <span>Analyser</span>
           </button>
           <div id="loading" class="loading" aria-live="polite">
-            <div class="spinner"></div><span>Processing…</span>
+            <div class="spinner"></div><span>Behandler…</span>
           </div>
         </div>
       </form>
-
-      <footer>Note: Plates may be personal data (GDPR). Ensure you have a legal basis before storing results.</footer>
     </div>
+
+    <!-- Eksempel sektion -->
+    <div class="card example">
+      <h2>Hvordan skal billedet tages:</h2>
+      <p class="muted">Sørg for hele nummerpladen er synlig, lige og i godt lys.</p>
+      <div class="imgbox">
+        <img src="{{ url_for('static', filename='imgs/example.jpg') }}" alt="Eksempel nummerplade foto">
+      </div>
+    </div>
+
+    <footer class="footer-note">
+      Sørg for at du har rettighederne til at bruge billedet. Billeder bliver gemt på vores server.
+    </footer>
   </div>
 
   <script>
@@ -54,11 +72,17 @@
     const drop = document.getElementById('drop');
     const preview = document.getElementById('preview');
     const loading = document.getElementById('loading');
+    const analyzeBtn = document.getElementById('analyzeBtn');
 
     function setPreview(f){
-      if(!f) { preview.textContent = ''; return; }
+      if(!f) {
+        preview.textContent = '';
+        analyzeBtn.classList.add('hidden');
+        return;
+      }
       const kb = Math.round(f.size/1024);
-      preview.textContent = `Selected: ${f.name} (${kb} KB)`;
+      preview.textContent = `Valgt: ${f.name} (${kb} KB)`;
+      analyzeBtn.classList.remove('hidden');
     }
 
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });

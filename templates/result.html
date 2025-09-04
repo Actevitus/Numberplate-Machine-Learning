@@ -1,53 +1,52 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
 <head>
   <meta charset="utf-8">
-  <title>Results • DK Plate Reader</title>
+  <title>Resultater • Nummerplade læser</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Results</h1>
+      <h1>Resultater</h1>
       <div class="row row-2">
         <div>
           <h2 class="muted">Original</h2>
           <div class="imgbox">
-            <img src="{{ original_url }}" alt="Uploaded image">
+            <img src="{{ original_url }}" alt="Uploaded billede">
           </div>
         </div>
         {% if annotated_url %}
         <div>
-          <h2 class="muted">Annotated</h2>
+          <h2 class="muted">Annoteret</h2>
           <div class="imgbox">
-            <img src="{{ annotated_url }}" alt="Annotated image with detections">
+            <img src="{{ annotated_url }}" alt="Annoteret billede med detektioner">
           </div>
         </div>
         {% endif %}
       </div>
       <div class="sticky">
-        <a class="btn" href="{{ url_for('index') }}">← Analyze another</a>
+        <a class="btn" href="{{ url_for('index') }}">← Analyser et nyt billede</a>
       </div>
     </div>
 
     <div class="card">
-      <h2>Detected Plates</h2>
+      <h2>Fundne nummerplader</h2>
       {% if no_plates %}
-        <p class="muted">No Danish-style plates were detected.</p>
+        <p class="muted">Ingen danske nummerplader blev fundet.</p>
       {% else %}
         {% for r in results %}
           <div style="margin-bottom:14px">
-            <div>Plate: <span class="plate">{{ r.plate }}</span>
-              <span class="muted">(conf {{ '%.2f'|format(r.confidence) }})</span>
+            <div>Nummerplade: <span class="plate">{{ r.plate }}</span>
+              <span class="muted">(sikkerhed {{ '%.2f'|format(r.confidence) }})</span>
             </div>
 
-            {% if r.errors.vehicle or r.errors.environment or r.errors.equipment %}
+            {% if r.errors.vehicle or r.errors.environment %}
               <div class="muted" style="margin-top:4px">
-                API issues:
-                {% if r.errors.vehicle %} vehicle={{ r.errors.vehicle }}{% endif %}
-                {% if r.errors.environment %} environment={{ r.errors.environment }}{% endif %}
-                {% if r.errors.equipment %} equipment={{ r.errors.equipment }}{% endif %}
+                API-fejl:
+                {% if r.errors.vehicle %} køretøj={{ r.errors.vehicle }}{% endif %}
+                {% if r.errors.environment %} miljø={{ r.errors.environment }}{% endif %}
               </div>
             {% endif %}
 
@@ -55,25 +54,63 @@
               <ul class="kv">
                 {% set v = r.vehicle %}
                 {% set env = r.environment or {} %}
-                {% if v.make or v.brand %}<li><b>Make</b>: {{ v.make or v.brand }}</li>{% endif %}
+                {% if v.make or v.brand %}<li><b>Mærke</b>: {{ v.make or v.brand }}</li>{% endif %}
                 {% if v.model %}<li><b>Model</b>: {{ v.model }}</li>{% endif %}
                 {% if v.variant %}<li><b>Variant</b>: {{ v.variant }}</li>{% endif %}
-                {% if v.model_year %}<li><b>Model year</b>: {{ v.model_year }}</li>{% endif %}
-                {% if v.first_registration %}<li><b>First reg.</b>: {{ v.first_registration }}</li>{% endif %}
-                {% if v.vin %}<li><b>VIN</b>: {{ v.vin }}</li>{% endif %}
-                {% if v.fuel_type or env.fuel_type %}<li><b>Fuel</b>: {{ v.fuel_type or env.fuel_type }}</li>{% endif %}
-                {% if env.emission_class %}<li><b>Emission class</b>: {{ env.emission_class }}</li>{% endif %}
-                {% if v.power_kw or v.power %}<li><b>Power</b>: {{ v.power_kw or v.power }} kW</li>{% endif %}
-                {% if v.total_weight or v.gross_weight %}<li><b>Weight</b>: {{ v.total_weight or v.gross_weight }} kg</li>{% endif %}
+                {% if v.model_year %}<li><b>Modelår</b>: {{ v.model_year }}</li>{% endif %}
+                {% if v.first_registration %}<li><b>Første registrering</b>: {{ v.first_registration }}</li>{% endif %}
+                {% if v.vin %}<li><b>Stelnummer (VIN)</b>: {{ v.vin }}</li>{% endif %}
+                {% if v.power_kw or v.power %}<li><b>Effekt</b>: {{ v.power_kw or v.power }} kW</li>{% endif %}
+                {% if v.total_weight or v.gross_weight %}<li><b>Vægt</b>: {{ v.total_weight or v.gross_weight }} kg</li>{% endif %}
               </ul>
-            {% else %}
-              <p class="muted">No vehicle data returned.</p>
-            {% endif %}
 
-            {% if r.equipment %}
-              <div class="muted" style="margin-top:6px">
-                Equipment (sample): {{ (r.equipment[:5] | join(', ')) ~ (' ...' if r.equipment|length > 5) }}
+              {# --- Miljøoplysninger --- #}
+              {% set euro = (env.euro_norm or '')|upper|trim %}
+              {% set pf = env.particle_filter in [1, true, 'true', 'True'] %}
+
+              {# Map euro_norm til talværdi #}
+              {% set euro_val = 0 %}
+              {% if "VII" in euro %}{% set euro_val = 7 %}
+              {% elif "VI" in euro %}{% set euro_val = 6 %}
+              {% elif "V" in euro %}{% set euro_val = 5 %}
+              {% elif "IV" in euro %}{% set euro_val = 4 %}
+              {% elif "III" in euro %}{% set euro_val = 3 %}
+              {% elif "II" in euro %}{% set euro_val = 2 %}
+              {% elif "I" in euro %}{% set euro_val = 1 %}
+              {% endif %}
+
+              {# Vælg CSS klasse #}
+              <div class="env-box
+                          {% if not pf or euro_val <= 4 %}bad
+                          {% elif euro_val == 5 %}warn
+                          {% else %}ok{% endif %}">
+                <h3>Miljøoplysninger</h3>
+                <ul class="kv">
+                  {% if v.fuel_type or env.fuel_type %}
+                    <li><b>Brændstof</b>: {{ v.fuel_type or env.fuel_type }}</li>
+                  {% endif %}
+                  {% if euro %}
+                    <li><b>Euronorm</b>: {{ euro }}</li>
+                  {% endif %}
+                  {% if env.particle_filter is defined %}
+                    <li><b>Partikelfilter</b>: {% if pf %}Ja{% else %}Nej{% endif %}</li>
+                  {% endif %}
+                  {% if env.co2_emission %}
+                    <li><b>CO₂</b>: {{ env.co2_emission }} g/km</li>
+                  {% endif %}
+                  {% if env.nox_emission %}
+                    <li><b>NOx</b>: {{ env.nox_emission }} mg/km</li>
+                  {% endif %}
+                </ul>
+                {% if not pf or euro_val <= 4 %}
+                  <p class="muted">⚠️ Denne bil opfylder ikke de anbefalede miljøkrav.</p>
+                {% elif euro_val == 5 %}
+                  <p class="muted">⚠️ Denne bil har Euro 5 – nyere miljøkrav er Euro 6.</p>
+                {% endif %}
               </div>
+
+            {% else %}
+              <p class="muted">Ingen køretøjsdata returneret.</p>
             {% endif %}
           </div>
           {% if not loop.last %}<hr style="border-color:#1f2937">{% endif %}
