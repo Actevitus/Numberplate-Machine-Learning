@@ -77,6 +77,14 @@ The `android_app_sourcecode/` folder contains the mobile client code, which inte
 
 ---
 
+## ⚙️ Installation
+1. Download the ".apk" file in "android_app_sourcecode/"
+2. On your phone, navigate to the download folder
+3. Click the .apk and select "run" 
+4. Google play store will scan the app, and it should run with no issues.
+
+---
+
 ## 📌 Notes
 - This is a school project; not production-ready.  
 - Requires internet access for vehicle data API calls.  
